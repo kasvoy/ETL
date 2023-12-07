@@ -1,8 +1,8 @@
 import requests, json, time
 
 def main():
-    get_all_rounds_2023(suffix="qualifying")
-    #write_apidata_to_file("http://ergast.com/api/f1/2023/drivers.json", "data/drivers.json")
+    #get_all_rounds_2023(suffix="qualifying")
+    get_race_schedule()
     
 
 def write_apidata_to_file(url: str, file_path: str):
@@ -23,8 +23,12 @@ def get_all_rounds_2023(suffix: str):
             time.sleep(2)
     else:
         print("Aborted")
+        
+def get_drivers_data():
+    write_apidata_to_file("http://ergast.com/api/f1/2023/drivers.json", "data/drivers.json")
 
-
+def get_race_schedule():
+    write_apidata_to_file("http://ergast.com/api/f1/2023.json", "data/schedule.json")
 
 if __name__ == "__main__":
     main()
