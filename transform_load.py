@@ -12,7 +12,6 @@ def main():
     drivers_df   = get_drivers_df(drivers_dict[TOP_KEY]["DriverTable"]["Drivers"])
     
     race_df = get_race_df()
-
     load_into_postgres(df=drivers_df, table_name="drivers")
     load_into_postgres(df=race_df, table_name="races")
         
@@ -73,21 +72,29 @@ def get_race_df() -> pd.DataFrame:
         race_dict = get_race_dict(round_no+1)
         results: list[dict] = race_dict["Results"]
 
+    
         race_name    = race_dict["raceName"]
         circuit_name = race_dict["Circuit"]["circuitName"]
         race_date    = race_dict["date"]
         no_laps      = results[0]["laps"]
-        #fastest_lap = 
-
         
-        info_df = pd.DataFrame([[race_name, circuit_name, race_date, no_laps]], columns=["Race Name", "Circuit Name", "Date", "Number of laps"])
+        fastest_lap_time = None
+        fastest_lap_driver_code = None
         
-
+        for driver_info in results:
+            if 'FastestLap' in driver_info.keys():
+                if driver_info['FastestLap']['rank'] == '1':
+                    fastest_lap_time = driver_info['FastestLap']['Time']['time']
+                    fastest_lap_driver_code = driver_info['Driver']['code']
+                    
+                    
+        fastest_lap_df = pd.DataFrame([[fastest_lap_time, fastest_lap_driver_code]], columns=["fastest_lap_time", "fastest_lap_driver"])
+        info_df = pd.DataFrame([[race_name, circuit_name, race_date, no_laps]], columns=["race_name", "circuit_name", "date", "no_laps"])
+        
         codes = [results[i]['Driver']['code'] for i in range(len(results))]
         pos_df = pd.DataFrame([codes], columns=['P'+str(i+1) for i in range(len(results))])
-
     
-        dflist.append(pd.concat([info_df, pos_df], axis=1))
+        dflist.append(pd.concat([info_df, pos_df, fastest_lap_df], axis=1))
     
     return pd.concat([df for df in dflist], ignore_index=True)
 
