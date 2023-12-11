@@ -13,13 +13,14 @@ def main():
     drivers_df   = get_drivers_df(drivers_dict[TOP_KEY]["DriverTable"]["Drivers"])
     
     race_info_df = get_race_info_df()
-    #quali_df = get_quali_df()
-    #load_into_postgres(df=drivers_df, table_name="drivers")
-    #load_into_postgres(df=race_info_df, table_name="race_info")
-    #load_into_postgres(df=quali_df, table_name="qualifying")
-    results_df = get_season_race_results_df()
-    load_into_postgres(df=results_df, table_name="race_results")
+    results_df = get_season_df(quali=False)
+    quali_df = get_season_df(quali=True)
     
+
+    load_into_postgres(df=quali_df, table_name="qualifying")
+    load_into_postgres(df=drivers_df, table_name="drivers")
+    load_into_postgres(df=race_info_df, table_name="race_info")
+    load_into_postgres(df=results_df, table_name="race_results")
     
 def json_into_dict(file_path: str) -> dict:
     with open(file_path, 'r') as f:
@@ -100,11 +101,10 @@ def get_race_result_df(round_no) -> pd.DataFrame:
         laps_completed = int(driver_result["laps"])
         finishing_status = driver_result["status"]
         
-        if "Time" in driver_result.keys():
-            time = driver_result["Time"]["time"]
         
-        elif finishing_status[0] == "+":
-            time = finishing_status
+        time_dict = driver_result.get("Time")
+        if time_dict:
+            time = time_dict['time']
         else:
             time = None
         
@@ -114,11 +114,14 @@ def get_race_result_df(round_no) -> pd.DataFrame:
     return pd.concat([df for df in driver_dflist], ignore_index=True)
     
         
-def get_season_race_results_df() -> pd.DataFrame:
+def get_season_df(quali: bool = False) -> pd.DataFrame:
     race_dfs: list[pd.DataFrame] = []
     
     for round_no in range(get_total_rounds()):
-        race_dfs.append(get_race_result_df(round_no=round_no+1))
+        if not quali:
+            race_dfs.append(get_race_result_df(round_no=round_no+1))
+        else:
+            race_dfs.append(get_quali_session_df(round_no=round_no+1))
     
     return pd.concat([df for df in race_dfs], ignore_index=True)
     
@@ -126,26 +129,26 @@ def get_season_race_results_df() -> pd.DataFrame:
 def get_fastest_lap_df() -> pd.DataFrame:
     pass
 
-def get_quali_df() -> pd.DataFrame:
-    quali_df_list = []
+def get_quali_session_df(round_no) -> pd.DataFrame:
     
-    for round_no in range(get_total_rounds()):
-        quali_dict = get_race_dict(round_no=round_no+1, quali=True)
-        quali_results: list[dict] = quali_dict["QualifyingResults"]
-   
-        (race_name, circuit_name, race_date) = get_basic_race_info(quali_dict)
-        info_df = pd.DataFrame([[race_name, circuit_name, race_date]], columns=["race_name", "circuit_name", "date"])
-        quali_pos_df = get_finishing_pos_df(quali_results)
-        
-        print(race_name)
-        for driver_info in quali_results:
-            print(driver_info.keys())
-        
-        quali_df_list.append(pd.concat([info_df, quali_pos_df], axis=1))
-        
+    quali_dict = get_race_dict(round_no=round_no,quali=True)
+    quali_results = quali_dict["QualifyingResults"]
+    race_name = quali_dict["raceName"]
+    df_lst: list[pd.DataFrame] = []
     
-    return pd.concat([df for df in quali_df_list], ignore_index=True)
-
+    
+    for driver_result in quali_results:
+        quali_pos = driver_result["position"]
+        driver_code = driver_result["Driver"]["code"]
+        q1_time = driver_result.get("Q1")
+        q2_time = driver_result.get("Q2")
+        q3_time = driver_result.get("Q3")
+        
+        column_names = ["round_no", "race_name", "quali_pos", "driver_code", "Q1_time", "Q2_time", "Q3_time"]
+        df_lst.append(pd.DataFrame([[round_no, race_name, quali_pos, driver_code, q1_time, q2_time, q3_time]], columns=column_names))
+        
+    return pd.concat([df for df in df_lst], ignore_index=True)
+        
 
 def load_into_postgres(df: pd.DataFrame, table_name: str):
     
