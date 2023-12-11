@@ -16,11 +16,14 @@ def main():
     results_df = get_season_df(quali=False)
     quali_df = get_season_df(quali=True)
     
-
-    load_into_postgres(df=quali_df, table_name="qualifying")
-    load_into_postgres(df=drivers_df, table_name="drivers")
-    load_into_postgres(df=race_info_df, table_name="race_info")
-    load_into_postgres(df=results_df, table_name="race_results")
+     
+    table_names = ["drivers", "race_info", "race_results", "qualifying"]
+    
+    for (df, table_name) in zip([drivers_df, race_info_df, results_df, quali_df], table_names):
+        try:
+            load_into_postgres(df=df, table_name=table_name)
+        except ValueError:
+            continue
     
 def json_into_dict(file_path: str) -> dict:
     with open(file_path, 'r') as f:
@@ -80,7 +83,8 @@ def get_race_info_df() -> pd.DataFrame:
         #total number of laps = number of finished laps by P1 driver 
         no_laps = race_dict["Results"][0]["laps"]
         
-        info_df = pd.DataFrame([[race_name, circuit_name, race_date, no_laps]], columns=["race_name", "circuit_name", "date", "no_laps"])    
+        column_names =["round_no", "race_name", "circuit_name", "date", "no_laps"]
+        info_df = pd.DataFrame([[round_no+1, race_name, circuit_name, race_date, no_laps]], columns=column_names)    
         dflist.append(info_df)
     
     return pd.concat([df for df in dflist], ignore_index=True)
@@ -138,7 +142,7 @@ def get_quali_session_df(round_no) -> pd.DataFrame:
     
     
     for driver_result in quali_results:
-        quali_pos = driver_result["position"]
+        quali_pos = int(driver_result["position"])
         driver_code = driver_result["Driver"]["code"]
         q1_time = driver_result.get("Q1")
         q2_time = driver_result.get("Q2")
