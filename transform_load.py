@@ -15,15 +15,17 @@ def main():
     race_info_df = get_race_info_df()
     results_df = get_season_df(quali=False)
     quali_df = get_season_df(quali=True)
-    
+    fastest_laps_df = get_season_fastest_laps_df()
      
-    table_names = ["drivers", "race_info", "race_results", "qualifying"]
+    table_names = ["drivers", "race_info", "race_results", "qualifying", "fastest_laps"]
     
-    for (df, table_name) in zip([drivers_df, race_info_df, results_df, quali_df], table_names):
+    for (df, table_name) in zip([drivers_df, race_info_df, results_df, quali_df, fastest_laps_df], table_names):
         try:
             load_into_postgres(df=df, table_name=table_name)
         except ValueError:
             continue
+        
+    print(get_race_fastest_lap_df(1))
     
 def json_into_dict(file_path: str) -> dict:
     with open(file_path, 'r') as f:
@@ -129,9 +131,37 @@ def get_season_df(quali: bool = False) -> pd.DataFrame:
     
     return pd.concat([df for df in race_dfs], ignore_index=True)
     
+def get_season_fastest_laps_df() -> pd.DataFrame:
+    flap_dfs: list[pd.DataFrame] = []
     
-def get_fastest_lap_df() -> pd.DataFrame:
-    pass
+    for round_no in range(get_total_rounds()):
+        flap_dfs.append(get_race_fastest_lap_df(round_no=round_no+1))
+    
+    return pd.concat([df for df in flap_dfs])
+
+  
+def get_race_fastest_lap_df(round_no) -> pd.DataFrame:
+    race_dict = get_race_dict(round_no=round_no)
+    results = race_dict["Results"]
+    race_name = race_dict["raceName"]
+    
+    
+    fastest_laps = [] 
+    
+    for driver_result in results:
+        driver_code = driver_result["Driver"]["code"]
+        
+        fastest_lap_dict = driver_result.get("FastestLap")
+        
+        if fastest_lap_dict:
+            time = fastest_lap_dict["Time"]["time"]
+            pos = int(fastest_lap_dict["rank"])
+            avg_speed = float(fastest_lap_dict["AverageSpeed"]["speed"])
+            fastest_laps.append([round_no, race_name, pos, time, driver_code, avg_speed])
+            
+    column_names = ["round_no", "race_name", "pos", "time", "driver_code", "avg_speed"]
+    return pd.DataFrame(fastest_laps, columns=column_names).sort_values(by="pos")  
+    
 
 def get_quali_session_df(round_no) -> pd.DataFrame:
     
